@@ -8,9 +8,7 @@ module.exports = o => {
             x="0" 
             y="0" 
             width="${w}" 
-            height="${h}" 
-            stroke="red"
-            stroke-width="10"
+            height="${h}"
             fill="black"/>
         <text 
             x="50%" 

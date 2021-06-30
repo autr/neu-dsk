@@ -1,53 +1,46 @@
 
-const MODE = (title, name, role, code) => ( { title, credits: [ { name, role } ], code } )
+const MODE = (title, description, code) => ( { title, description, code } )
 
 const AUTO = 'AUTO'
 const SDTV = 'SDTV'
 const HDMI = 'HDMI'
+const CUSTOM = 'CUSTOM'
 
 module.exports = [
     MODE( 
         AUTO, 
-        `Auto-detect`,`CVBS or HDMI`, 
+        `Auto-detect CVBS or HDMI`, 
         `` ),
     MODE( 
         SDTV, 
-        `NTSE`, 
-        `interlaced`, 
+        `NTSE(interlaced)`, 
         `sdtv_mode=0` ),
     MODE( 
         SDTV, 
-        `NTSE`, 
-        `Japanese`, 
+        `NTSE (Japan)`, 
         `sdtv_mode=1` ),
     MODE( 
         SDTV, 
-        `PAL`, 
-        `interlaced`, 
+        `PAL (interlaced)`, 
         `sdtv_mode=2` ),
     MODE( 
         SDTV, 
-        `PAL`, 
-        `Brazilian`, 
+        `PAL (Brazil)`, 
         `sdtv_mode=3` ), 
     MODE( 
         SDTV, 
-        `NTSE`, 
-        `progressive scan`, 
+        `NTSE (progressive scan)`, 
         `sdtv_mode=16` ),
     MODE( 
         SDTV, 
-        `PAL`, 
-        `progressive scan`, 
+        `PAL (progressive scan)`, 
         `sdtv_mode=18` ),
     MODE( 
         HDMI, 
-        `Force`, 
-        `3.5mm audio`, 
-        `hdmi_group=0\nhdmi_force_hotplug=1\nhdmi_drive=1` ),
+        `Safe mode (720p)`, 
+        `hdmi_safe=1` ),
     MODE( 
-        HDMI, 
-        `Force`, 
-        `HDMI audio`, 
-        `hdmi_group=0\nhdmi_force_hotplug=1\nhdmi_drive=2` )
+        CUSTOM, 
+        `Read from disk`, 
+        `` )
 ]

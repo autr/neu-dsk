@@ -5,7 +5,7 @@ import RPi.GPIO as GPIO
 from time import sleep
 import signal, os, subprocess, sys
 
-buttons = [26,24,21,19,23,32,7,8,9,10,11,12]
+buttons = [7,8,9,10,11,12] # 26,24,21,19,23,32
 
 
 def both(channel):

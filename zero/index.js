@@ -7,8 +7,9 @@ const MODES = require('./modes.js')
 const minimist = require('minimist')
 const os = require('os')
 const RPiGPIOButtons = require('rpi-gpio-buttons') 
+const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples/001.mov`
 
-console.log('[o-dsk] current user', os.userInfo().username, process.env.USER)
+console.log('[o-dsk] 👤  current user', os.userInfo().username, process.env.USER)
 
 
 let ARGS = minimist( process.argv.slice(2) ) 
@@ -20,7 +21,7 @@ const SKIPPREV = 'SKIPPREV'
 const PLAYPAUSE = 'PLAYPAUSE'
 
  
-console.log( `[o-dsk] argumnents ${JSON.stringify(ARGS)}`)
+console.log( `[o-dsk] 👁  argumnents ${JSON.stringify(ARGS)}`)
 
 const BTNS = {
     12: VOLUP,
@@ -31,33 +32,46 @@ const BTNS = {
     7: SKIPPREV
 }
 
-console.log( `[o-dsk] pins ${Object.keys(BTNS).join(',')}`)
+console.log( `[o-dsk] 👁  pins ${Object.keys(BTNS).join(',')}`)
 
 
 let HOLDING = 0
 
+const config = async e => {
+
+    const str = await (await fs.readFileSync( `/boot/config.txt` )).toString()
+
+    const a = str.indexOf(STR.BEGIN)
+    const b = str.indexOf(STR.END) + STR.END.length
+    const found = !(b < a || a == -1 || b == -1)
+
+    return { a, b, found, str }
+}
+
+
 const save = async e => {
 
     let { str, found, a, b } = await config()
-    let neu = `
-${STR.BEGIN}
+    let neu = `${STR.BEGIN}
 ${STR.MODE}${MODE}
-# ${MODES[MODE].credits[0].name} ${MODES[MODE].credits[0].role}
+# ${MODES[MODE].text}
 ${MODES[MODE].code}
-${STR.END}
-    `
+${STR.END}`
+    let piece
     if (!found) {
         str += neu 
     } else {
-        let chunk = str.substring(a, b)
-        str = str.replace(chunk, neu)
+        piece = str.substring(a, b)
+        str = str.replace(piece, neu)
     }
 
+    const ending = s => (s.substring( s.length - 40, s.length ))
+
     await fs.writeFileSync( '/boot/config.txt', str )
-    console.log(`[o-dsk] wrote mode ${MODE} to boot config\n`, neu)
+    console.log(`[o-dsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
     await show('info', 0)
     setTimeout( async e => {
-        await execSync(`sudo reboot now`) 
+        // await execSync(`sudo reboot now`) 
     }, GAP)
 }
 
@@ -74,37 +88,31 @@ const gpio = async e => {
 
 
     buttons.on('error', async err => {
-        console.log('[o-dsk] button error', err)
-        
-    })
-    buttons.on('debug', async debug => {
-        console.log('[o-dsk] button debug', debug)
+        console.log('[o-dsk] 🚨  button error', err)
         
     })
 
     buttons.on('pressed', async pin => {
         let PIN = BTNS[pin] 
-        console.log('[o-dsk] button released', PIN, pin)
-
-
+        console.log('[o-dsk] ❄️  button released', PIN, pin)
         if ( PIN == OMNI ) {
             let neu = new Date()
             if (neu - HOLDING > 4500) {
-                console.log('[o-disk] resetting to auto (pressed and held)')
+                console.log('[o-disk] 🛰  resetting to auto (pressed and held)')
                 MODE = 0
                 await save()
             } else {
                 MODE_TOGGLE = !MODE_TOGGLE
                 await modish( 0 )
             }
-
         }
-
-        
     })
+
+
+
     buttons.on('released', async pin => {
         let PIN = BTNS[pin]
-        console.log('[o-dsk] button pressed', PIN, pin)
+        console.log('[o-dsk] 🔆  button pressed', PIN, pin)
 
         if ( PIN == SKIPPREV ) {
             if (!MODE_TOGGLE) await skip(-1)
@@ -115,36 +123,37 @@ const gpio = async e => {
             if (MODE_TOGGLE) await modish(1)
         }
 
-        if ( PIN == VOLDOWN ) {
-            if (!MODE_TOGGLE && PROC) await PROC.stdin.write('-')
-            if (MODE_TOGGLE) await modish(-1)
-        }
-        if ( PIN == VOLUP ) {
-            if (!MODE_TOGGLE && PROC) await PROC.stdin.write('+')
-            if (MODE_TOGGLE) await modish(1)
-        }
-
-        if ( PIN == PLAYPAUSE ) {
-            if (!MODE_TOGGLE) await toggle()
-            if (MODE_TOGGLE) await save()
+        if ( PIN == VOLDOWN || PIN == VOLUP ) {
+            if (!MODE_TOGGLE && PROC) {
+                if ( PIN == VOLDOWN && VOL >= -4800 + 300 ) {
+                    VOL -= 300
+                    await PROC.stdin.write('-')
+                }
+                if ( PIN == VOLUP && VOL <= -300 - 300 ) {
+                    VOL += 300
+                    await PROC.stdin.write('+')
+                }
+                await fs.writeFileSync( DIRS.VOL, VOL + '' )
+                console.log(`[o-disk] 🔊  volume ${VOL/1000}db ${VOL}`)
+            } else {
+                if ( PIN == VOLDOWN ) await modish(-1)
+                if ( PIN == VOLUP ) await modish(1)
+            }
         }
 
         if ( PIN == OMNI ) {
             HOLDING = new Date()
         }
 
-    })
+        if ( PIN == PLAYPAUSE ) {
+            if (PROC) await PROC.stdin.write(' ')
+        }
 
-    buttons.on('clicked', async pin => {
-        let PIN = BTNS[pin] 
-        console.log('[o-dsk] clicked', PIN, pin)
-        
     })
-
 
     
     buttons.init().catch(err => {
-        console.error('[o-dsk] error initialising buttons:', err.message)
+        console.error('[o-dsk] ❌  error initialising buttons:', err.message)
     })
 }
 
@@ -158,55 +167,24 @@ const gpio = async e => {
 // })
 
 
-let KEYBOARD = false
-
-if (KEYBOARD) {
-
-    keypress(process.stdin)
-
-    process.stdin.on('keypress', async (ch, key) => {
-
-        console.log('[o-dsk] keypress', key.name)
-
-        if ( key.name == 'escape' ) {
-            await KILL.player()
-            await KILL.fbi()
-            await KILL.node()
-        }
-
-        if ( key.name == 'left' ) await skip(-1)
-        if ( key.name == 'right' ) await skip(1)
-
-        if ( key.name == 'down' && PROC ) await PROC.stdin.write('-')
-        if ( key.name == 'up' && PROC ) await PROC.stdin.write('+')
-
-        if ( key.name == 'space' ) toggle()
-        if ( key && key.ctrl && key.name == 'c' ) process.stdin.pause()
-    });
-     
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-
-
-}
 
 let DEBUG = false
 let FORCE = ARGS.f
 let ERRORS = false
 let IDX = 0
 let PROC = null
-let VOL = 0.5
+let VOL = -600
 let LIST = [] 
-let GAP = 1000
+let GAP = 5000
 let TIMEOUT = null
 let MODE = 0
 
 
 let CMDS = {
     player: e => process.platform == 'darwin' ? 'mplayer' : 'omxplayer',
-    settings: e => process.platform == 'darwin' ? '' : '-b -o alsa:hw:0,0'
+    settings: e => process.platform == 'darwin' ? '' : `-b --vol ${VOL} -o alsa:hw:0,0`
 }
-if ( !ARGS._[0] ) return console.error('[o-dsk] exiting - no folder specified')
+if ( !ARGS._[0] ) return console.error('[o-dsk] ❌  exiting - no folder specified')
 let ROOT = path.resolve( ARGS._[0] )
 let BIN = path.resolve( ROOT, './bin' )
 const DIRS = {
@@ -239,12 +217,12 @@ const skip = async num => {
     IDX += num
     if (IDX < 0) IDX = LIST.length - 1
     if (IDX >= LIST.length) IDX = 0
-    console.log(`[o-dsk] switched IDX ${IDX}` )
+    console.log(`[o-dsk] ⏳  switched IDX ${IDX}` )
     await start()
 
 }
 const toggle = async e => {
-    console.log('[o-dsk] pause / play')
+    console.log('[o-dsk] 🏁  pause / play')
     if (PROC) PROC.stdin.write(' ')
 }
 
@@ -285,21 +263,21 @@ const start = async e => {
 
         const entry = LIST[IDX]
         const url = path.resolve(DIRS.ROOT, entry.file )
-        const ex = `${CMDS.player()} ${CMDS.settings()} ${url}`
+        let ex = `${CMDS.player()} ${CMDS.settings()} ${url}`
 
-        console.log(`[o-dsk] playing ${entry.title} -> ${ path.basename(url) }`)
-        console.log(`[o-dsk] ${ex}`)
+        console.log(`[o-dsk] 🎬  playing ${entry.title} -> ${ path.basename(url) }`)
+        console.log(`[o-dsk] 🎬  ${ex}`)
         PROC = exec( ex, async (error, stdout, stderr) => {
 
             const data = {error,stdout,stderr}
             const type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
             const o = data[type]
 
-            console.log(`[${CMDS.player()}] player ${type}:`, o.code, o.killed, o.signal )
+            console.log(`[${CMDS.player()}] 📼  player ${type}:`, o.code, o.killed, o.signal )
             // console.log(`[${CMDS.player()}] exited with code ${code}`, id )
             PROC = null
             if (type == 'stdout') {
-                console.log(`[${CMDS.player()}] skipping to next from stdout`)
+                console.log(`[${CMDS.player()}] 📼  skipping to next from stdout`)
                 await skip(1)
             }
         })
@@ -324,7 +302,7 @@ const create = async (type, list) => {
 
     }
 
-    if (count > 0) console.log(`[o-dsk] generated ${count} ${type} overlays`)
+    if (count > 0) console.log(`[o-dsk] 🏭  generated ${count} ${type} overlays`)
 }
 
 let STR = {
@@ -333,35 +311,35 @@ let STR = {
     MODE: '# MODE='
 }
 
-const config = async e => {
-
-    const str = await (await fs.readFileSync( `/boot/config.txt` )).toString()
-
-    const a = str.indexOf(STR.BEGIN)
-    const b = str.indexOf(STR.END)
-    const found = !(b < a || a == -1 || b == -1)
-
-    return { a, b, found, str }
-}
-
 const patch = async e => {
     const res = (await execSync('python ../buttons.py')).toString()
     console.log(`[o-dsk] patching gpio buttons bug: ${res.replaceAll('\n', ' ')}`)
 }
+const wait = async ms => ( new Promise(resolve => setTimeout(resolve, ms) ) )
 
 const run = async e => {
+
 
     await KILL.fbi()
     await KILL.player()
     await gpio()
-    await patch()
 
-    // let PINS = Object.keys(BTNS)
-    // for (let i = 0; i < PINS.length; i++){
-    //     let PIN = PINS[i]
-    //     console.log(`[o-dsk] refreshing pin ${PIN}`)
-    //     try { await execSync(`echo ${PIN} > /sys/class/gpio/unexport`) } catch(err) {}
-    // }
+    // await patch()
+    // await wait(1000)
+
+    let PINS = Object.keys(BTNS)
+    for (let i = 0; i < PINS.length; i++){
+        let PIN = PINS[i]
+        console.log(`[o-dsk] ♻️  refreshing pin ${PIN}`)
+        let cmds = {
+            unexport: `echo ${PIN} > /sys/class/gpio/unexport`,
+            export: `echo ${PIN} > /sys/class/gpio/export`,
+            direction: `echo in > /sys/class/gpio/gpio${PIN}/direction`
+        }
+        try { await execSync( cmds.unexport ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+        try { await execSync( cmds.export ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+        try { await execSync( cmds.direction ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+    }
 
     if ( !(await fs.existsSync( DIRS.BIN )) ) {
         console.log('[o-dsk] creating bin...')
@@ -372,8 +350,8 @@ const run = async e => {
 
     try {
         if ( !(await fs.existsSync( DIRS.VOL )) ) await fs.writeFileSync( DIRS.VOL, VOL + '' )
-        VOL = parseFloat( await (await fs.readFileSync( DIRS.VOL )).toString() )
-        console.log(`[o-dsk] volume.txt ${VOL}`)
+        VOL = parseInt( await (await fs.readFileSync( DIRS.VOL )).toString() )
+        console.log(`[o-dsk] 🔊  volume.txt ${VOL}`)
     } catch(err) {
         return console.error(`[o-dsk] could not load volume.txt ${err.message}`)
     }
@@ -383,9 +361,9 @@ const run = async e => {
     try {
         if ( !(await fs.existsSync( DIRS.TIMEOUT )) ) await fs.writeFileSync( DIRS.TIMEOUT, GAP + '' )
         GAP = parseInt( await (await fs.readFileSync( DIRS.TIMEOUT )).toString() )
-        console.log(`[o-dsk] timeout.txt ${VOL}`)
+        console.log(`[o-dsk] ⏱  timeout.txt ${VOL}`)
     } catch(err) {
-        return console.error(`[o-dsk] could not load timeout.txt ${err.message}`) 
+        return console.error(`[o-dsk] ❌  could not load timeout.txt ${err.message}`) 
     }
 
     // READ PLAYLIST 
@@ -393,7 +371,7 @@ const run = async e => {
     try {
         LIST = JSON.parse( await (await fs.readFileSync( DIRS.PLAYLIST )).toString() )
     } catch(err) {
-        return console.error(`[o-dsk] could not load playlist.json ${err.message}`)
+        return console.error(`[o-dsk] ❌  could not load playlist.json ${err.message}`)
     }
 
     // READ MODE
@@ -403,11 +381,11 @@ const run = async e => {
 
         if ( !found ) {
             MODE = 0
-            console.log('[o-dsk] no explicit mode set from config (auto)')
+            console.log('[o-dsk] 🤖  no explicit mode set from config (auto)')
         } else {
             const c = str.indexOf(STR.MODE)
             MODE = parseInt( str.substring(c + STR.MODE.length).split('\n')[0] )
-            console.log(`[o-dsk] mode from boot config ${JSON.stringify(MODES[MODE])}`)
+            console.log(`[o-dsk] 🤖  mode from boot config ${JSON.stringify(MODES[MODE])}`)
         }
 
     } catch(err) {
@@ -422,12 +400,7 @@ const run = async e => {
         await create('info', [
             {
                 title: 'Restarting',
-                credits: [
-                    {
-                        name: 'Config',
-                        role: 'Update'
-                    }
-                ]
+                text: 'Updating config'
             }
         ]) 
     }, GAP)

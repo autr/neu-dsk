@@ -1,0 +1,24 @@
+{
+  "name": "zero",
+  "version": "1.0.0",
+  "description": "Commandline version for Raspberry Pi Zero",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js /home/dietpi/dsk/samples -f",
+    "start": "node index.js /home/dietpi/dsk/samples",
+    "cron": "EDITOR=/bin/nano VISUAL=nano crontab -e"
+  },
+  "author": "Gilbert Sinnott <g@sinnott.cc>",
+  "license": "MIT",
+  "dependencies": {
+    "keypress": "^0.2.1",
+    "minimist": "^1.2.5",
+    "node-gyp": "^8.1.0",
+    "button-events": "^1.0.2",
+    "rpi-gpio": "file:../rpi-gpio",
+    "rpi-gpio-buttons": "file:../rpi-gpio-buttons"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
+  }
+}

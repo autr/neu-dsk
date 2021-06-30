@@ -1,0 +1,16 @@
+.icon path {
+  stroke: var(--color);
+  stroke-width: 2px;
+  fill: none; }
+
+.icon:active, .icon.filled {
+  border-color: var(--color) !important; }
+  .icon:active path, .icon.filled path {
+    stroke: var(--bg); }
+
+#svelte-announcer {
+  display: none; }
+
+.vertical {
+  transform: rotate(270deg);
+  transform-origin: 50% 50%; }

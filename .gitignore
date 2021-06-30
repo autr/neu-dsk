@@ -1,0 +1,12 @@
+.DS_Store
+static/full
+build
+.svelte
+package-lock.json
+pnpm-lock.yaml
+node_modules
+zero/bin/*
+rpi-gpio
+rpi-gpio-buttons
+samples/*
+._*

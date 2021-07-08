@@ -8,6 +8,7 @@ const minimist = require('minimist')
 const os = require('os')
 const RPiGPIOButtons = require('rpi-gpio-buttons') 
 const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples/001.mov`
+const mime = require('mime')
 
 console.log('[o-dsk] 👤  current user', os.userInfo().username, process.env.USER)
 
@@ -34,7 +35,6 @@ const BTNS = {
 
 console.log( `[o-dsk] 👁  pins ${Object.keys(BTNS).join(',')}`)
 
-
 let HOLDING = 0
 
 const config = async e => {
@@ -52,10 +52,25 @@ const config = async e => {
 const save = async e => {
 
     let { str, found, a, b } = await config()
+
+    let mode = MODES[MODE]
+    let txt = mode.text
+
+    if ( mode.type == 'CUSTOM' ) {
+        let custom = path.resolve(ROOT, 'custom.txt')
+        if ( await fs.existsSync( custom ) ) {
+            mode.code = (await fs.readFileSync( custom )).toString()
+            console.log(`[o-dsk] 🛠  using custom mode\n`, txt)
+        } else {
+            console.warn(`[o-dsk] ❌  could not find a custom.txt`)
+            return (await show( 'info', 1 ))
+        }
+    }
+
     let neu = `${STR.BEGIN}
 ${STR.MODE}${MODE}
-# ${MODES[MODE].text}
-${MODES[MODE].code}
+# ${txt.replaceAll('\n', ' - ')}
+${mode.code}
 ${STR.END}`
     let piece
     if (!found) {
@@ -71,7 +86,7 @@ ${STR.END}`
     console.log(`[o-dsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
     await show('info', 0)
     setTimeout( async e => {
-        // await execSync(`sudo reboot now`) 
+        await execSync(`sudo reboot now`) 
     }, GAP)
 }
 
@@ -134,7 +149,7 @@ const gpio = async e => {
                     await PROC.stdin.write('+')
                 }
                 await fs.writeFileSync( DIRS.VOL, VOL + '' )
-                console.log(`[o-disk] 🔊  volume ${VOL/1000}db ${VOL}`)
+                console.log(`[o-disk] 🔊  volume -> ${VOL/1000}db ${VOL}`)
             } else {
                 if ( PIN == VOLDOWN ) await modish(-1)
                 if ( PIN == VOLUP ) await modish(1)
@@ -142,11 +157,13 @@ const gpio = async e => {
         }
 
         if ( PIN == OMNI ) {
+            if (!PROC) clearTimeout(TIMEOUT)
             HOLDING = new Date()
         }
 
         if ( PIN == PLAYPAUSE ) {
             if (PROC) await PROC.stdin.write(' ')
+            if (!PROC) await save()
         }
 
     })
@@ -191,7 +208,6 @@ const DIRS = {
     ROOT,
     BIN,
     VOL: path.resolve( BIN, './volume.txt'),
-    PLAYLIST: path.resolve( ROOT, './playlist.json'),
     TIMEOUT: path.resolve( BIN, './timeout.txt')
 }
 
@@ -261,12 +277,12 @@ const start = async e => {
 
     TIMEOUT = setTimeout( ee => {
 
-        const entry = LIST[IDX]
-        const url = path.resolve(DIRS.ROOT, entry.file )
+        const url = path.resolve(DIRS.ROOT, LIST[IDX].name )
         let ex = `${CMDS.player()} ${CMDS.settings()} ${url}`
 
-        console.log(`[o-dsk] 🎬  playing ${entry.title} -> ${ path.basename(url) }`)
+        console.log(`[o-dsk] 🎬  playing ${ path.basename(url) }`)
         console.log(`[o-dsk] 🎬  ${ex}`)
+
         PROC = exec( ex, async (error, stdout, stderr) => {
 
             const data = {error,stdout,stderr}
@@ -295,7 +311,7 @@ const create = async (type, list) => {
 
         if (!(await fs.existsSync( png )) || FORCE ) {
             const cmd = `MAGICK_FONT_PATH=/usr/share/fonts/truetype/custom rsvg-convert ${svg} > ${png}` 
-            await fs.writeFileSync( svg, template(o) )
+            await fs.writeFileSync( svg, template(o.text) )
             await execSync( cmd )
             count += 1
         }
@@ -324,22 +340,22 @@ const run = async e => {
     await KILL.player()
     await gpio()
 
-    // await patch()
+    await patch()
     // await wait(1000)
 
-    let PINS = Object.keys(BTNS)
-    for (let i = 0; i < PINS.length; i++){
-        let PIN = PINS[i]
-        console.log(`[o-dsk] ♻️  refreshing pin ${PIN}`)
-        let cmds = {
-            unexport: `echo ${PIN} > /sys/class/gpio/unexport`,
-            export: `echo ${PIN} > /sys/class/gpio/export`,
-            direction: `echo in > /sys/class/gpio/gpio${PIN}/direction`
-        }
-        try { await execSync( cmds.unexport ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
-        try { await execSync( cmds.export ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
-        try { await execSync( cmds.direction ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
-    }
+    // let PINS = Object.keys(BTNS)
+    // for (let i = 0; i < PINS.length; i++){
+    //     let PIN = PINS[i]
+    //     console.log(`[o-dsk] ♻️  refreshing pin ${PIN}`)
+    //     let cmds = {
+    //         unexport: `echo ${PIN} > /sys/class/gpio/unexport`,
+    //         export: `echo ${PIN} > /sys/class/gpio/export`,
+    //         direction: `echo in > /sys/class/gpio/gpio${PIN}/direction`
+    //     }
+    //     try { await execSync( cmds.unexport ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+    //     try { await execSync( cmds.export ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+    //     try { await execSync( cmds.direction ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+    // }
 
     if ( !(await fs.existsSync( DIRS.BIN )) ) {
         console.log('[o-dsk] creating bin...')
@@ -369,10 +385,19 @@ const run = async e => {
     // READ PLAYLIST 
 
     try {
-        LIST = JSON.parse( await (await fs.readFileSync( DIRS.PLAYLIST )).toString() )
+        LIST = await Promise.all( (await fs.readdirSync( DIRS.ROOT )).filter( url => (mime.getType(url).indexOf('video') != -1)).map( async url => {
+
+            const TXT = path.resolve( DIRS.ROOT, path.parse(url).name + '.txt' )
+            if (await fs.existsSync( TXT )) {
+                return { text: (await fs.readFileSync( TXT )).toString(), name: url }
+            }
+            return url
+        }) )
+
     } catch(err) {
         return console.error(`[o-dsk] ❌  could not load playlist.json ${err.message}`)
     }
+
 
     // READ MODE
 
@@ -397,15 +422,14 @@ const run = async e => {
     setTimeout( async e => {
         await create('video', LIST) 
         await create('mode', MODES)
-        await create('info', [
-            {
-                title: 'Restarting',
-                text: 'Updating config'
-            }
+        await create('info', [ 
+            { text: 'Restarting\nUpdating config'},
+            { text: 'No config.txt\nAdd to disk root to enable'},
         ]) 
     }, GAP)
 
 
+    // return console.log(LIST)
     await start()
 }
 

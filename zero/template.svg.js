@@ -1,4 +1,7 @@
-module.exports = o => {
+module.exports = text => {
+
+    const title = text.split('\n')[0]
+    const lines = text.split('\n').splice(1)
 
     const w = 720
     const h = 576
@@ -24,19 +27,19 @@ module.exports = o => {
                     font-size="${parseInt( h * 0.1 ) }"
                     text-anchor="middle" 
                     x="50%"
-                    y="${parseInt( 45 - (o.credits.length * 5) )}%"
+                    y="${parseInt( 45 - (lines.length * 5) )}%"
                     dy="0em">
-                    ${o.title}
+                    ${title}
                 </tspan>
                 <tspan dy="2em"></tspan>
-                ${o.credits.map( c => {
+                ${lines.map( c => {
                     return `
                     <tspan 
                         font-size="${parseInt( h * 0.06 ) }"
                         text-anchor="middle" 
                         x="50%"
                         dy="2em">
-                        ${c.name} - ${c.role}
+                        ${c}
                     </tspan>`
                 }).join('')}
         </text>

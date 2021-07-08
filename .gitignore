@@ -10,3 +10,4 @@ rpi-gpio
 rpi-gpio-buttons
 samples/*
 ._*
+.env

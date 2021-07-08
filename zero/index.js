@@ -10,7 +10,7 @@ const RPiGPIOButtons = require('rpi-gpio-buttons')
 const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples/001.mov`
 const mime = require('mime')
 
-console.log('[o-dsk] 👤  current user', os.userInfo().username, process.env.USER)
+console.log('[odsk] 👤  via user:', os.userInfo().username, process.env.USER)
 
 
 let ARGS = minimist( process.argv.slice(2) ) 
@@ -22,7 +22,7 @@ const SKIPPREV = 'SKIPPREV'
 const PLAYPAUSE = 'PLAYPAUSE'
 
  
-console.log( `[o-dsk] 👁  argumnents ${JSON.stringify(ARGS)}`)
+console.log( `[odsk] 👁  commandline args ${JSON.stringify(ARGS)}`)
 
 const BTNS = {
     12: VOLUP,
@@ -33,7 +33,7 @@ const BTNS = {
     7: SKIPPREV
 }
 
-console.log( `[o-dsk] 👁  pins ${Object.keys(BTNS).join(',')}`)
+console.log( `[odsk] 👁  using pins ${Object.keys(BTNS).join(',')}`)
 
 let HOLDING = 0
 
@@ -60,9 +60,9 @@ const save = async e => {
         let custom = path.resolve(ROOT, 'custom.txt')
         if ( await fs.existsSync( custom ) ) {
             mode.code = (await fs.readFileSync( custom )).toString()
-            console.log(`[o-dsk] 🛠  using custom mode\n`, txt)
+            console.log(`[odsk] 🛠  using custom mode\n`, txt)
         } else {
-            console.warn(`[o-dsk] ❌  could not find a custom.txt`)
+            console.warn(`[odsk] ❌  could not find a custom.txt`)
             return (await show( 'info', 1 ))
         }
     }
@@ -83,7 +83,7 @@ ${STR.END}`
     const ending = s => (s.substring( s.length - 40, s.length ))
 
     await fs.writeFileSync( '/boot/config.txt', str )
-    console.log(`[o-dsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
+    console.log(`[odsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
     await show('info', 0)
     setTimeout( async e => {
         await execSync(`sudo reboot now`) 
@@ -103,14 +103,15 @@ const gpio = async e => {
 
 
     buttons.on('error', async err => {
-        console.log('[o-dsk] 🚨  button error', err)
+        console.log('[odsk] 🚨  button error', err)
         
     })
 
     buttons.on('pressed', async pin => {
         let PIN = BTNS[pin] 
-        console.log('[o-dsk] ❄️  button released', PIN, pin)
+        console.log(`[odsk] ❄️  released ${PIN.toLowerCase()}`)
         if ( PIN == OMNI ) {
+            await KILL.player()
             let neu = new Date()
             if (neu - HOLDING > 4500) {
                 console.log('[o-disk] 🛰  resetting to auto (pressed and held)')
@@ -127,7 +128,7 @@ const gpio = async e => {
 
     buttons.on('released', async pin => {
         let PIN = BTNS[pin]
-        console.log('[o-dsk] 🔆  button pressed', PIN, pin)
+        console.log(`[odsk] 🔆  pressed ${PIN.toLowerCase()}`)
 
         if ( PIN == SKIPPREV ) {
             if (!MODE_TOGGLE) await skip(-1)
@@ -170,7 +171,7 @@ const gpio = async e => {
 
     
     buttons.init().catch(err => {
-        console.error('[o-dsk] ❌  error initialising buttons:', err.message)
+        console.error('[odsk] ❌  error initialising buttons:', err.message)
     })
 }
 
@@ -201,7 +202,7 @@ let CMDS = {
     player: e => process.platform == 'darwin' ? 'mplayer' : 'omxplayer',
     settings: e => process.platform == 'darwin' ? '' : `-b --vol ${VOL} -o alsa:hw:0,0`
 }
-if ( !ARGS._[0] ) return console.error('[o-dsk] ❌  exiting - no folder specified')
+if ( !ARGS._[0] ) return console.error('[odsk] ❌  exiting - no folder specified')
 let ROOT = path.resolve( ARGS._[0] )
 let BIN = path.resolve( ROOT, './bin' )
 const DIRS = {
@@ -233,12 +234,12 @@ const skip = async num => {
     IDX += num
     if (IDX < 0) IDX = LIST.length - 1
     if (IDX >= LIST.length) IDX = 0
-    console.log(`[o-dsk] ⏳  switched IDX ${IDX}` )
+    console.log(`[odsk] ⏳  switched to ${IDX}/${LIST.length}` )
     await start()
 
 }
 const toggle = async e => {
-    console.log('[o-dsk] 🏁  pause / play')
+    console.log('[odsk] 🏁  pause / play')
     if (PROC) PROC.stdin.write(' ')
 }
 
@@ -246,7 +247,9 @@ const toggle = async e => {
 const show = async (type, idx) => {
 
     await KILL.fbi()
-    await execSync( `sudo fbi -d /dev/fb0 -T 1 --nocomments --noverbose --cachemem 1 ${path.resolve(DIRS.BIN, `${type}-${idx}.png`)}`)
+    let img = `${type}-${idx}.png`
+    console.log(`[odsk] 🖼  displaying ${img}`)
+    await execSync( `sudo fbi -d /dev/fb0 -T 1 --nocomments --noverbose --cachemem 1 ${path.resolve(DIRS.BIN, `${img} > /dev/null 2>&1`)}`)
 }
 
 let MODE_TOGGLE = false
@@ -270,9 +273,11 @@ const start = async e => {
         TIMEOUT = null
     }
 
+    await KILL.player()
+
+
     await show('video', IDX)
 
-    await KILL.player()
     PROC = null
 
     TIMEOUT = setTimeout( ee => {
@@ -280,8 +285,8 @@ const start = async e => {
         const url = path.resolve(DIRS.ROOT, LIST[IDX].name )
         let ex = `${CMDS.player()} ${CMDS.settings()} ${url}`
 
-        console.log(`[o-dsk] 🎬  playing ${ path.basename(url) }`)
-        console.log(`[o-dsk] 🎬  ${ex}`)
+        console.log(`[odsk] 🎬  playing ${ path.basename(url) }`)
+        console.log(`[odsk] 🎬  ${ex}`)
 
         PROC = exec( ex, async (error, stdout, stderr) => {
 
@@ -318,7 +323,7 @@ const create = async (type, list) => {
 
     }
 
-    if (count > 0) console.log(`[o-dsk] 🏭  generated ${count} ${type} overlays`)
+    if (count > 0) console.log(`[odsk] 🏭  generated ${count} ${type} overlays`)
 }
 
 let STR = {
@@ -329,7 +334,7 @@ let STR = {
 
 const patch = async e => {
     const res = (await execSync('python ../buttons.py')).toString()
-    console.log(`[o-dsk] patching gpio buttons bug: ${res.replaceAll('\n', ' ')}`)
+    console.log(`[odsk] 🐍  gpio buttons patch: ${res.replaceAll('\n', ' ')}`)
 }
 const wait = async ms => ( new Promise(resolve => setTimeout(resolve, ms) ) )
 
@@ -346,19 +351,19 @@ const run = async e => {
     // let PINS = Object.keys(BTNS)
     // for (let i = 0; i < PINS.length; i++){
     //     let PIN = PINS[i]
-    //     console.log(`[o-dsk] ♻️  refreshing pin ${PIN}`)
+    //     console.log(`[odsk] ♻️  refreshing pin ${PIN}`)
     //     let cmds = {
     //         unexport: `echo ${PIN} > /sys/class/gpio/unexport`,
     //         export: `echo ${PIN} > /sys/class/gpio/export`,
     //         direction: `echo in > /sys/class/gpio/gpio${PIN}/direction`
     //     }
-    //     try { await execSync( cmds.unexport ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
-    //     try { await execSync( cmds.export ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
-    //     try { await execSync( cmds.direction ) } catch(err) { console.error('[o-dsk] ❌ ', err.message) }
+    //     try { await execSync( cmds.unexport ) } catch(err) { console.error('[odsk] ❌ ', err.message) }
+    //     try { await execSync( cmds.export ) } catch(err) { console.error('[odsk] ❌ ', err.message) }
+    //     try { await execSync( cmds.direction ) } catch(err) { console.error('[odsk] ❌ ', err.message) }
     // }
 
     if ( !(await fs.existsSync( DIRS.BIN )) ) {
-        console.log('[o-dsk] creating bin...')
+        console.log('[odsk] creating bin...')
         await fs.mkdirSync( DIRS.BIN )
     }
 
@@ -367,9 +372,9 @@ const run = async e => {
     try {
         if ( !(await fs.existsSync( DIRS.VOL )) ) await fs.writeFileSync( DIRS.VOL, VOL + '' )
         VOL = parseInt( await (await fs.readFileSync( DIRS.VOL )).toString() )
-        console.log(`[o-dsk] 🔊  volume.txt ${VOL}`)
+        console.log(`[odsk] 🔊  volume.txt ${VOL}`)
     } catch(err) {
-        return console.error(`[o-dsk] could not load volume.txt ${err.message}`)
+        return console.error(`[odsk] could not load volume.txt ${err.message}`)
     }
 
     // READ TIMEOUT / GAP
@@ -377,9 +382,9 @@ const run = async e => {
     try {
         if ( !(await fs.existsSync( DIRS.TIMEOUT )) ) await fs.writeFileSync( DIRS.TIMEOUT, GAP + '' )
         GAP = parseInt( await (await fs.readFileSync( DIRS.TIMEOUT )).toString() )
-        console.log(`[o-dsk] ⏱  timeout.txt ${VOL}`)
+        console.log(`[odsk] ⏱  timeout.txt ${VOL}`)
     } catch(err) {
-        return console.error(`[o-dsk] ❌  could not load timeout.txt ${err.message}`) 
+        return console.error(`[odsk] ❌  could not load timeout.txt ${err.message}`) 
     }
 
     // READ PLAYLIST 
@@ -395,7 +400,7 @@ const run = async e => {
         }) )
 
     } catch(err) {
-        return console.error(`[o-dsk] ❌  could not load playlist.json ${err.message}`)
+        return console.error(`[odsk] ❌  could not load playlist.json ${err.message}`)
     }
 
 
@@ -406,27 +411,23 @@ const run = async e => {
 
         if ( !found ) {
             MODE = 0
-            console.log('[o-dsk] 🤖  no explicit mode set from config (auto)')
+            console.log('[odsk] 🤖  no explicit mode set from config (auto)')
         } else {
             const c = str.indexOf(STR.MODE)
             MODE = parseInt( str.substring(c + STR.MODE.length).split('\n')[0] )
-            console.log(`[o-dsk] 🤖  mode from boot config ${JSON.stringify(MODES[MODE])}`)
+            console.log(`[odsk] 🤖  mode from boot config ${MODES[MODE].text.replaceAll('\n', ' ')}`)
         }
 
     } catch(err) {
-        return console.error(`[o-dsk] could not load boot config ${err.message}`)
+        return console.error(`[odsk] could not load boot config ${err.message}`)
     }
 
-    await show( 'mode', MODE )
-
-    setTimeout( async e => {
-        await create('video', LIST) 
-        await create('mode', MODES)
-        await create('info', [ 
-            { text: 'Restarting\nUpdating config'},
-            { text: 'No config.txt\nAdd to disk root to enable'},
-        ]) 
-    }, GAP)
+    await create('video', LIST) 
+    await create('mode', MODES)
+    await create('info', [ 
+        { text: 'Restarting\nUpdating config'},
+        { text: 'No config.txt\nAdd to disk root to enable'},
+    ]) 
 
 
     // return console.log(LIST)

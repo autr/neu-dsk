@@ -1,0 +1,5 @@
+# CUSTOM VIDEO MODE
+# List of available settings: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
+# Example: (uncomment to enable)
+# hdmi_group=1 # CEA (consumer electronics association)
+# hdmi_mode=17 # 576p 50hz 4:3

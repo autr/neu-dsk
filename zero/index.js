@@ -62,7 +62,7 @@ const save = async e => {
             mode.code = (await fs.readFileSync( custom )).toString()
             console.log(`[odsk] 🛠  using custom mode\n`, txt)
         } else {
-            console.warn(`[odsk] ❌  could not find a custom.txt`)
+            console.warn(`[odsk] ❌  could not find a custom.txt at ${custom}`)
             return (await show( 'info', 1 ))
         }
     }
@@ -211,6 +211,8 @@ const DIRS = {
     VOL: path.resolve( BIN, './volume.txt'),
     TIMEOUT: path.resolve( BIN, './timeout.txt')
 }
+
+console.log(`[odsk] 🛣  using paths ${JSON.stringify(DIRS)}`)
 
 const KILL = {
     fbi: async e => {
@@ -390,9 +392,10 @@ const run = async e => {
     // READ PLAYLIST 
 
     try {
-        LIST = await Promise.all( (await fs.readdirSync( DIRS.ROOT )).filter( url => (mime.getType(url).indexOf('video') != -1)).map( async url => {
+        LIST = await Promise.all( (await fs.readdirSync( DIRS.ROOT )).filter( url => ((mime.getType(url)||'').indexOf('video') != -1)).map( async url => {
 
             const TXT = path.resolve( DIRS.ROOT, path.parse(url).name + '.txt' )
+            console.log(`[odsk] adding ${TXT} to playlist`)
             if (await fs.existsSync( TXT )) {
                 return { text: (await fs.readFileSync( TXT )).toString(), name: url }
             }
@@ -400,7 +403,7 @@ const run = async e => {
         }) )
 
     } catch(err) {
-        return console.error(`[odsk] ❌  could not load playlist.json ${err.message}`)
+        return console.error(`[odsk] ❌  could read lists at ${DIRS.ROOT} ${err.message}`)
     }
 
 

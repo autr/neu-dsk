@@ -403,10 +403,10 @@ const run = async e => {
         }) )
 
     } catch(err) {
-        return console.error(`[odsk] ❌  could read lists at ${DIRS.ROOT} ${err.message}`)
+        return console.error(`[odsk] ❌  could read lists at ${DIRS.ROOT}`)
     }
-
-
+ 
+    console.log('OI!!!!! remember to match up txt with mp4')
     // READ MODE
 
     try {
@@ -422,11 +422,14 @@ const run = async e => {
         }
 
     } catch(err) {
-        return console.error(`[odsk] could not load boot config ${err.message}`)
+        return console.error(`[odsk] could not load boot config`)
     }
 
-    await create('video', LIST) 
+    console.log('gen video', LIST)
+    await create('video', LIST)
+    console.log('gen node') 
     await create('mode', MODES)
+    console.log('gen info')
     await create('info', [ 
         { text: 'Restarting\nUpdating config'},
         { text: 'No config.txt\nAdd to disk root to enable'},

@@ -17,8 +17,8 @@
     "mime": "^2.5.2",
     "minimist": "^1.2.5",
     "node-gyp": "^8.1.0",
-    "rpi-gpio": "file:../rpi-gpio",
-    "rpi-gpio-buttons": "file:../rpi-gpio-buttons"
+    "rpi-gpio": "file:../libs/rpi-gpio",
+    "rpi-gpio-buttons": "file:../libs/rpi-gpio-buttons"
   },
   "devDependencies": {
     "nodemon": "^2.0.7"

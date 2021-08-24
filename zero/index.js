@@ -369,7 +369,7 @@ let STR = {
 }
 
 const patch = async e => {
-    const res = (await execSync('python ../buttons.py')).toString()
+    const res = (await execSync('python ../libs/buttons.py')).toString()
     console.log(`[odsk] 🐍  gpio buttons patch: ${res.replaceAll('\n', ' ')}`)
 }
 const wait = async ms => ( new Promise(resolve => setTimeout(resolve, ms) ) )
@@ -382,6 +382,7 @@ const run = async e => {
     await gpio()
 
     await patch()
+    
     // await wait(1000)
 
     // let PINS = Object.keys(BTNS)

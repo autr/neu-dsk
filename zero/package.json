@@ -4,8 +4,8 @@
   "description": "Commandline version for Raspberry Pi Zero",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js /mnt/media",
-    "start": "node index.js /mnt/media",
+    "dev": "pkill node && nodemon index.js /mnt/media",
+    "start": "pkill node && node index.js /mnt/media",
     "cron": "EDITOR=/bin/nano VISUAL=nano crontab -e"
   },
   "author": "Gilbert Sinnott <g@sinnott.cc>",

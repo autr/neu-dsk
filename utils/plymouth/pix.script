@@ -47,4 +47,4 @@ fun message_callback (text) {
 	sprite.SetImage (resized_image);
 }
 
-Plymouth.SetUpdateStatusFunction(message_callback);
+# Plymouth.SetUpdateStatusFunction(message_callback);

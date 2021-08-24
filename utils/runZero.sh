@@ -1,9 +1,18 @@
 #!/bin/bash
 
-# DIETPI ONLY
-# /var/lib/dietpi/dietpi-autostart/custom.sh
+# 1) use .bashrc to launch with autologin
+# 2) edit /boot/dietpi/postboot to hide extra output
 
-# printf "\033c" # clear console
-# tput setaf 0 # set console colour to black
-cd /home/dietpi/dsk/zero # nav to zero location
-node index.js /mnt/media > /mnt/media/.bin/log.txt # output to log file
+# clear console one page
+printf "\033c" 
+
+# set console colour to black
+tput setaf 0 
+
+# navigate to zero app
+cd /home/dietpi/dsk/zero 
+
+# run with log to txt
+
+node index.js /mnt/media > /mnt/media/.bin/log.txt
+

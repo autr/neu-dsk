@@ -15,6 +15,9 @@ const InputEvent = require('input-event')
 console.log('[odsk] 👤  via user:', os.userInfo().username, process.env.USER)
 
 
+const INFO_RESTART = 0
+const INFO_NO_CONFIG = 1
+
 let ARGS = minimist( process.argv.slice(2) ) 
 const VOLUP = 'VOLUP' 
 const VOLDOWN = 'VOLDOWN'
@@ -35,18 +38,15 @@ const KEYS = {
 console.log( `[odsk] 👁  commandline args ${JSON.stringify(ARGS)}`)
 
 const BTNS = {
-    12: VOLUP,
-    9: VOLDOWN,
-    8: OMNI,
-    11: SKIPNEXT,
-    10: PLAYPAUSE,
-    7: SKIPPREV
+    12: VOLUP, // up
+    9: VOLDOWN, // down
+    8: OMNI, // enter
+    11: SKIPNEXT, // right 
+    10: PLAYPAUSE, // space
+    7: SKIPPREV // left
 }
 
 console.log( `[odsk] 👁  using pins ${Object.keys(BTNS).join(',')}`)
-
-let HOLDING = 0
-
 
 let DEBUG = false
 let FORCE = ARGS.f
@@ -88,8 +88,16 @@ const config = async e => {
     return { a, b, found, str }
 }
 
+let ENDOFDAYS = false
 
 const save = async e => {
+
+    ENDOFDAYS = true
+
+    keyboard.removeListener('keyup', onKeyup)
+    keyboard.removeListener('keypress', onKeypress)
+
+
 
     let { str, found, a, b } = await config()
 
@@ -125,32 +133,39 @@ ${STR.END}`
 
     await fs.writeFileSync( '/boot/config.txt', str )
     console.log(`[odsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
-    await show('info', INFO_RESTART)
 
+    await KILL.player()
+
+    // TODO: this is a hacky fix
+    
+    await show('info', INFO_RESTART)
+    
     setTimeout( async e => {
+        console.log(`[odsk] ⚡️  rebooting now`)
         await execSync(`sudo reboot now`) 
     }, GAP)
 }
 
 
-async function onPressed( PIN ) {
+async function onReleased( PIN ) {
+
+    if (ENDOFDAYS) return
 
     console.log(`[odsk] ❄️  released ${PIN.toLowerCase()}`)
     if ( PIN == OMNI ) {
+        clearTimeout( RESET_TIMEOUT )
+        MODE_TOGGLE = !MODE_TOGGLE
+        await modish( 0 )
         await KILL.player()
-        let neu = new Date()
-        if (neu - HOLDING > 4500) {
-            console.log('[o-disk] 🛰  resetting to auto (pressed and held)')
-            MODE = 0
-            await save()
-        } else {
-            MODE_TOGGLE = !MODE_TOGGLE
-            await modish( 0 )
-        }
     }
 }
 
-async function onReleased( PIN ) {
+let RESET_TIMEOUT = null
+const RESET_TIME = 4500
+
+async function onPressed( PIN ) {
+
+    if (ENDOFDAYS) return
 
     console.log(`[odsk] 🔆  pressed ${PIN.toLowerCase()}`)
 
@@ -177,20 +192,28 @@ async function onReleased( PIN ) {
             }
             await fs.writeFileSync( DIRS.VOL, VOL + '' )
         } else {
-            if ( PIN == VOLDOWN ) await modish(-1)
-            if ( PIN == VOLUP ) await modish(1)
+            // if ( PIN == VOLDOWN ) await modish(-1)
+            // if ( PIN == VOLUP ) await modish(1)
+        }
+    }
+
+    if ( PIN == PLAYPAUSE ) {
+        if (PROC) await PROC.stdin.write(' ')
+        if (!PROC && MODE_TOGGLE) {
+            console.log('[o-disk] 🛰  saving settings')
+            await save()
         }
     }
 
     if ( PIN == OMNI ) {
         if (!PROC) clearTimeout(TIMEOUT)
-        HOLDING = new Date()
+        RESET_TIMEOUT = setTimeout( async e => {
+            console.log('[o-disk] 🛰  pressed and held - 720p / NTSC')
+            MODE = 0
+            await save()
+        }, RESET_TIME)
     }
 
-    if ( PIN == PLAYPAUSE ) {
-        if (PROC) await PROC.stdin.write(' ')
-        if (!PROC) await save()
-    }
 
 }
 
@@ -213,17 +236,20 @@ const gpio = async e => {
 const input = new InputEvent('/dev/input/event0')
 const keyboard = new InputEvent.Keyboard(input)
 
-keyboard.on('keyup', e => {
+async function onKeyup(e) {
+    if (ENDOFDAYS) return
     console.log(`[odsk] 🎹  keyup ${KEYS[e.code]}`)
     onReleased( KEYS[e.code] )
-})
-keyboard.on('keypress', e => {
+}
+
+async function onKeypress(e) {
+    if (ENDOFDAYS) return
     console.log(`[odsk] 🎹  keypress ${KEYS[e.code]}`)
     onPressed( KEYS[e.code] )
-})
-// keyboard.on('keydown', e => {
-//     console.log('[odsk] 🎹  keydown', KEYS[e.code], e)
-// })
+}
+
+keyboard.on('keyup', onKeyup)
+keyboard.on('keypress', onKeypress)
 
 
 
@@ -232,16 +258,19 @@ Object.entries(DIRS).forEach( o => ( console.log(`${o[0]} ${o[1]}\n------------`
 
 const KILL = {
     fbi: async e => {
+        console.log('[odsk] ⚰️  killing framebuffer')
         try { 
             await execSync( `sudo pkill fbi`) 
         } catch(err) {}
     },
     node: async e => {
+        console.log('[odsk] ⚰️  killing node')
         try {  
             await execSync( `sudo pkill node`)
         } catch(err) {}
     },
     player: async e => {
+        console.log('[odsk] ⚰️  killing player')
         try { 
             await execSync( `pkill ${CMDS.player()}`) 
         } catch(err) {}
@@ -263,6 +292,7 @@ const toggle = async e => {
 
 
 const show = async (type, idx) => {
+
 
     await KILL.fbi()
     let img = `${type}-${idx}.png`
@@ -291,14 +321,12 @@ const start = async e => {
         TIMEOUT = null
     }
 
-    await show('video', IDX)
     await KILL.player()
-
-
+    await show('video', IDX)
 
     PROC = null
 
-    TIMEOUT = setTimeout( ee => {
+    TIMEOUT = setTimeout( async ee => {
 
         const url = path.resolve(DIRS.ROOT, LIST[IDX].name )
         let ex = `${CMDS.player()} ${CMDS.settings()} ${url}`
@@ -307,6 +335,8 @@ const start = async e => {
         console.log(`[odsk] 🎬  ${ex}`)
 
         PROC = exec( ex, async (error, stdout, stderr) => {
+
+            if (ENDOFDAYS) return
 
             const data = {error,stdout,stderr}
             let type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
@@ -326,6 +356,9 @@ const start = async e => {
 }
 
 const create = async (type, list, PLYMOUTH) => {
+
+    if (ENDOFDAYS) return
+
     let count = 0
     for (let i = 0; i < list.length; i++ ) {
         const o = list[i]
@@ -380,9 +413,8 @@ const run = async e => {
     await KILL.fbi()
     await KILL.player()
     await gpio()
-
     await patch()
-    
+
     // await wait(1000)
 
     // let PINS = Object.keys(BTNS)
@@ -439,7 +471,7 @@ const run = async e => {
         LIST = await Promise.all( (await fs.readdirSync( DIRS.ROOT )).filter( url => ((mime.getType(url)||'').indexOf('video') != -1)).map( async url => {
 
             const TXT = path.resolve( DIRS.ROOT, path.parse(url).name + '.txt' )
-            console.log(`[odsk] adding ${TXT} to playlist`)
+            console.log(`[odsk] 💿  ${TXT} added to playlist`)
             if (await fs.existsSync( TXT )) {
                 return { text: (await fs.readFileSync( TXT )).toString(), name: url }
             }
@@ -475,14 +507,12 @@ const run = async e => {
     await create('mode', MODES)
     console.log('[odsk] 🎨  generating info overlays')
     await create('info', [ 
-        { text: 'Restarting\nUpdating config'},
+        { text: 'Restarting'},
         { text: 'No config.txt\nAdd to disk root to enable'}
     ])
     console.log('[odsk] 🎨  generating splash overlay')
     await create('splash', [{ text: SPLASH }], true)
 
-    const INFO_RESTART = 0
-    const INFO_NO_CONFIG = 1
 
 
     // return console.log(LIST)

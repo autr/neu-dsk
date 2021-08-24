@@ -4,14 +4,15 @@
   "description": "Commandline version for Raspberry Pi Zero",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js /home/dietpi/dsk/samples -f",
-    "start": "node index.js /home/dietpi/dsk/samples",
+    "dev": "nodemon index.js /mnt/media",
+    "start": "node index.js /mnt/media",
     "cron": "EDITOR=/bin/nano VISUAL=nano crontab -e"
   },
   "author": "Gilbert Sinnott <g@sinnott.cc>",
   "license": "MIT",
   "dependencies": {
     "button-events": "^1.0.2",
+    "input-event": "^1.2.6",
     "keypress": "^0.2.1",
     "mime": "^2.5.2",
     "minimist": "^1.2.5",

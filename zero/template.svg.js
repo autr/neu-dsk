@@ -1,5 +1,5 @@
 module.exports = text => {
-
+	text = text || ''
     const title = text.split('\n')[0]
     const lines = text.split('\n').splice(1)
 

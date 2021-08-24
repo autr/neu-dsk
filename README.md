@@ -1,3 +1,3 @@
-# DSK
+# ODSK
 
 WIP, media player.

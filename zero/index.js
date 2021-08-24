@@ -9,6 +9,8 @@ const os = require('os')
 const RPiGPIOButtons = require('rpi-gpio-buttons') 
 const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples/001.mov`
 const mime = require('mime')
+const InputEvent = require('input-event')
+
 
 console.log('[odsk] 👤  via user:', os.userInfo().username, process.env.USER)
 
@@ -21,7 +23,15 @@ const SKIPNEXT = 'SKIPNEXT'
 const SKIPPREV = 'SKIPPREV'
 const PLAYPAUSE = 'PLAYPAUSE'
 
- 
+const KEYS = {
+    105: SKIPPREV,
+    106: SKIPNEXT, 
+    103: VOLUP,
+    108: VOLDOWN,
+    57: PLAYPAUSE,
+    28: OMNI
+}
+
 console.log( `[odsk] 👁  commandline args ${JSON.stringify(ARGS)}`)
 
 const BTNS = {
@@ -36,6 +46,36 @@ const BTNS = {
 console.log( `[odsk] 👁  using pins ${Object.keys(BTNS).join(',')}`)
 
 let HOLDING = 0
+
+
+let DEBUG = false
+let FORCE = ARGS.f
+let ERRORS = false
+let IDX = 0
+let PROC = null
+let VOL = -300
+let LIST = [] 
+let GAP = 5000
+let SPLASH = 'odsk'
+let TIMEOUT = null
+let MODE = 0
+
+
+let CMDS = {
+    player: e => process.platform == 'darwin' ? 'mplayer' : 'omxplayer',
+    settings: e => process.platform == 'darwin' ? '' : `-b --vol ${VOL} -o alsa:hw:0,0`
+}
+if ( !ARGS._[0] ) return console.error('[odsk] ❌  exiting - no folder specified')
+let ROOT = path.resolve( ARGS._[0] )
+let BIN = path.resolve( ROOT, './.bin' )
+const DIRS = {
+    ROOT,
+    BIN,
+    VOL: path.resolve( BIN, './volume.txt'),
+    TIMEOUT: path.resolve( BIN, './timeout.txt'),
+    SPLASH: path.resolve( BIN, './splash.txt')
+}
+
 
 const config = async e => {
 
@@ -63,7 +103,8 @@ const save = async e => {
             console.log(`[odsk] 🛠  using custom mode\n`, txt)
         } else {
             console.warn(`[odsk] ❌  could not find a custom.txt at ${custom}`)
-            return (await show( 'info', 1 ))
+            return (await show( 'info', INFO_NO_CONFIG ))
+
         }
     }
 
@@ -84,10 +125,73 @@ ${STR.END}`
 
     await fs.writeFileSync( '/boot/config.txt', str )
     console.log(`[odsk] 🗳  wrote mode ${MODE} to boot config\n`, neu)
-    await show('info', 0)
+    await show('info', INFO_RESTART)
+
     setTimeout( async e => {
         await execSync(`sudo reboot now`) 
     }, GAP)
+}
+
+
+async function onPressed( PIN ) {
+
+    console.log(`[odsk] ❄️  released ${PIN.toLowerCase()}`)
+    if ( PIN == OMNI ) {
+        await KILL.player()
+        let neu = new Date()
+        if (neu - HOLDING > 4500) {
+            console.log('[o-disk] 🛰  resetting to auto (pressed and held)')
+            MODE = 0
+            await save()
+        } else {
+            MODE_TOGGLE = !MODE_TOGGLE
+            await modish( 0 )
+        }
+    }
+}
+
+async function onReleased( PIN ) {
+
+    console.log(`[odsk] 🔆  pressed ${PIN.toLowerCase()}`)
+
+    if ( PIN == SKIPPREV ) {
+        if (!MODE_TOGGLE) await skip(-1)
+        if (MODE_TOGGLE) await modish(-1)
+    }
+    if ( PIN == SKIPNEXT ) {
+        if (!MODE_TOGGLE) await skip(1)
+        if (MODE_TOGGLE) await modish(1)
+    }
+
+    if ( PIN == VOLDOWN || PIN == VOLUP ) {
+        if (!MODE_TOGGLE && PROC) {
+            if ( PIN == VOLDOWN && VOL >= -4800 + 300 ) {
+                console.log(`[o-disk] 🔊  -300 ${VOL/1000}db ${VOL}`)
+                VOL -= 300
+                await PROC.stdin.write('-')
+            }
+            if ( PIN == VOLUP && VOL <= -300 - 300 ) {
+                console.log(`[o-disk] 🔊  +300 ${VOL/1000}db ${VOL}`)
+                VOL += 300
+                await PROC.stdin.write('+')
+            }
+            await fs.writeFileSync( DIRS.VOL, VOL + '' )
+        } else {
+            if ( PIN == VOLDOWN ) await modish(-1)
+            if ( PIN == VOLUP ) await modish(1)
+        }
+    }
+
+    if ( PIN == OMNI ) {
+        if (!PROC) clearTimeout(TIMEOUT)
+        HOLDING = new Date()
+    }
+
+    if ( PIN == PLAYPAUSE ) {
+        if (PROC) await PROC.stdin.write(' ')
+        if (!PROC) await save()
+    }
+
 }
 
 const gpio = async e => {
@@ -100,119 +204,31 @@ const gpio = async e => {
         pressed: 10,
         clicked: 10
     })
-
-
-    buttons.on('error', async err => {
-        console.log('[odsk] 🚨  button error', err)
-        
-    })
-
-    buttons.on('pressed', async pin => {
-        let PIN = BTNS[pin] 
-        console.log(`[odsk] ❄️  released ${PIN.toLowerCase()}`)
-        if ( PIN == OMNI ) {
-            await KILL.player()
-            let neu = new Date()
-            if (neu - HOLDING > 4500) {
-                console.log('[o-disk] 🛰  resetting to auto (pressed and held)')
-                MODE = 0
-                await save()
-            } else {
-                MODE_TOGGLE = !MODE_TOGGLE
-                await modish( 0 )
-            }
-        }
-    })
-
-
-
-    buttons.on('released', async pin => {
-        let PIN = BTNS[pin]
-        console.log(`[odsk] 🔆  pressed ${PIN.toLowerCase()}`)
-
-        if ( PIN == SKIPPREV ) {
-            if (!MODE_TOGGLE) await skip(-1)
-            if (MODE_TOGGLE) await modish(-1)
-        }
-        if ( PIN == SKIPNEXT ) {
-            if (!MODE_TOGGLE) await skip(1)
-            if (MODE_TOGGLE) await modish(1)
-        }
-
-        if ( PIN == VOLDOWN || PIN == VOLUP ) {
-            if (!MODE_TOGGLE && PROC) {
-                if ( PIN == VOLDOWN && VOL >= -4800 + 300 ) {
-                    VOL -= 300
-                    await PROC.stdin.write('-')
-                }
-                if ( PIN == VOLUP && VOL <= -300 - 300 ) {
-                    VOL += 300
-                    await PROC.stdin.write('+')
-                }
-                await fs.writeFileSync( DIRS.VOL, VOL + '' )
-                console.log(`[o-disk] 🔊  volume -> ${VOL/1000}db ${VOL}`)
-            } else {
-                if ( PIN == VOLDOWN ) await modish(-1)
-                if ( PIN == VOLUP ) await modish(1)
-            }
-        }
-
-        if ( PIN == OMNI ) {
-            if (!PROC) clearTimeout(TIMEOUT)
-            HOLDING = new Date()
-        }
-
-        if ( PIN == PLAYPAUSE ) {
-            if (PROC) await PROC.stdin.write(' ')
-            if (!PROC) await save()
-        }
-
-    })
-
-    
-    buttons.init().catch(err => {
-        console.error('[odsk] ❌  error initialising buttons:', err.message)
-    })
+    buttons.on('error', async err => ( console.log('[odsk] 🚨  button error', err) ))
+    buttons.on('pressed', pin => onPressed(BTNS[pin]))
+    buttons.on('released', pin => onPressed(BTNS[pin]))
+    buttons.init().catch(err => ( console.error('[odsk] ❌  error initialising buttons:', err.message)))
 }
 
-// const exits = [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`]
+const input = new InputEvent('/dev/input/event0')
+const keyboard = new InputEvent.Keyboard(input)
 
-// exits.forEach((eventType) => {
-//     process.on(eventType, e => {
-//         console.log('YOYOYOYO EXIT', eventType) 
-//         return process.exit(0)
-//     }) 
+keyboard.on('keyup', e => {
+    console.log(`[odsk] 🎹  keyup ${KEYS[e.code]}`)
+    onReleased( KEYS[e.code] )
+})
+keyboard.on('keypress', e => {
+    console.log(`[odsk] 🎹  keypress ${KEYS[e.code]}`)
+    onPressed( KEYS[e.code] )
+})
+// keyboard.on('keydown', e => {
+//     console.log('[odsk] 🎹  keydown', KEYS[e.code], e)
 // })
 
 
 
-let DEBUG = false
-let FORCE = ARGS.f
-let ERRORS = false
-let IDX = 0
-let PROC = null
-let VOL = -600
-let LIST = [] 
-let GAP = 5000
-let TIMEOUT = null
-let MODE = 0
-
-
-let CMDS = {
-    player: e => process.platform == 'darwin' ? 'mplayer' : 'omxplayer',
-    settings: e => process.platform == 'darwin' ? '' : `-b --vol ${VOL} -o alsa:hw:0,0`
-}
-if ( !ARGS._[0] ) return console.error('[odsk] ❌  exiting - no folder specified')
-let ROOT = path.resolve( ARGS._[0] )
-let BIN = path.resolve( ROOT, './bin' )
-const DIRS = {
-    ROOT,
-    BIN,
-    VOL: path.resolve( BIN, './volume.txt'),
-    TIMEOUT: path.resolve( BIN, './timeout.txt')
-}
-
-console.log(`[odsk] 🛣  using paths ${JSON.stringify(DIRS)}`)
+console.log(`[odsk] 🛣  using paths\n------------`)
+Object.entries(DIRS).forEach( o => ( console.log(`${o[0]} ${o[1]}\n------------`) ) )
 
 const KILL = {
     fbi: async e => {
@@ -275,10 +291,10 @@ const start = async e => {
         TIMEOUT = null
     }
 
+    await show('video', IDX)
     await KILL.player()
 
 
-    await show('video', IDX)
 
     PROC = null
 
@@ -293,14 +309,14 @@ const start = async e => {
         PROC = exec( ex, async (error, stdout, stderr) => {
 
             const data = {error,stdout,stderr}
-            const type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
+            let type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
             const o = data[type]
-
-            console.log(`[${CMDS.player()}] 📼  player ${type}:`, o.code, o.killed, o.signal )
-            // console.log(`[${CMDS.player()}] exited with code ${code}`, id )
+            if (type == 'error') type = 'exited'
+            console.log(`[${CMDS.player()}] 📼   player ${type}`, o.code, o.killed || '', o.signal || '' )
+ 
             PROC = null
             if (type == 'stdout') {
-                console.log(`[${CMDS.player()}] 📼  skipping to next from stdout`)
+                console.log(`[${CMDS.player()}] 📼   skipping to next from stdout`)
                 await skip(1)
             }
         })
@@ -309,23 +325,41 @@ const start = async e => {
 
 }
 
-const create = async (type, list) => {
+const create = async (type, list, PLYMOUTH) => {
     let count = 0
     for (let i = 0; i < list.length; i++ ) {
         const o = list[i]
-        const svg = path.resolve(DIRS.BIN, `${type}-${i}.svg` )
-        const png = path.resolve(DIRS.BIN, `${type}-${i}.png` )
+        const markup = template(o.text)
+        let svg = path.resolve(DIRS.BIN, `${type}-${i}.svg` )
+        let png = path.resolve(DIRS.BIN, `${type}-${i}.png` )
 
-        if (!(await fs.existsSync( png )) || FORCE ) {
+        if (PLYMOUTH) {
+            svg = '/usr/share/plymouth/themes/pix/splash.svg'
+            png = '/usr/share/plymouth/themes/pix/splash.png'
+            console.log(`[odsk] 🍇  using plymouth ${png}`)
+        }
+
+        let hasChanged = false
+
+        if (await fs.existsSync(svg)) {
+            const s = await ( await fs.readFileSync( svg ) ).toString()
+            hasChanged = markup != s
+        } else {
+            hasChanged = true
+        }
+
+        if (!(await fs.existsSync( png )) || FORCE || hasChanged ) {
             const cmd = `MAGICK_FONT_PATH=/usr/share/fonts/truetype/custom rsvg-convert ${svg} > ${png}` 
-            await fs.writeFileSync( svg, template(o.text) )
+            await fs.writeFileSync( svg, markup )
             await execSync( cmd )
+            console.log(`[odsk] 🖼  ${png}`)
             count += 1
         }
 
-    }
 
-    if (count > 0) console.log(`[odsk] 🏭  generated ${count} ${type} overlays`)
+
+    }
+    if (count > 0) console.log(`[odsk] ✅  ${count} new ${type} overlays`)
 }
 
 let STR = {
@@ -389,6 +423,15 @@ const run = async e => {
         return console.error(`[odsk] ❌  could not load timeout.txt ${err.message}`) 
     }
 
+    // READ SPLASH
+
+    try {
+        SPLASH = await (await fs.readFileSync( DIRS.SPLASH )).toString()
+        console.log(`[odsk] 💦  splash.txt ${SPLASH}`)
+    } catch(err) {
+        console.error(`[odsk] 💦  using default splash ${SPLASH}`) 
+    }
+
     // READ PLAYLIST 
 
     try {
@@ -405,8 +448,7 @@ const run = async e => {
     } catch(err) {
         return console.error(`[odsk] ❌  could read lists at ${DIRS.ROOT}`)
     }
- 
-    console.log('OI!!!!! remember to match up txt with mp4')
+
     // READ MODE
 
     try {
@@ -425,15 +467,21 @@ const run = async e => {
         return console.error(`[odsk] could not load boot config`)
     }
 
-    console.log('gen video', LIST)
+    console.log('[odsk] 🎨  generating video overlays\n------------')
+    LIST.forEach( o => (console.log(`${o?.name}\n${o?.text}\n------------`)))
     await create('video', LIST)
-    console.log('gen node') 
+    console.log('[odsk] 🎨  generating node overlays') 
     await create('mode', MODES)
-    console.log('gen info')
+    console.log('[odsk] 🎨  generating info overlays')
     await create('info', [ 
         { text: 'Restarting\nUpdating config'},
-        { text: 'No config.txt\nAdd to disk root to enable'},
-    ]) 
+        { text: 'No config.txt\nAdd to disk root to enable'}
+    ])
+    console.log('[odsk] 🎨  generating splash overlay')
+    await create('splash', [{ text: SPLASH }], true)
+
+    const INFO_RESTART = 0
+    const INFO_NO_CONFIG = 1
 
 
     // return console.log(LIST)

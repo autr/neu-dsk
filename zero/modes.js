@@ -41,6 +41,6 @@ module.exports = [
         `hdmi_safe=1` ),
     MODE( 
         CUSTOM, 
-        `Read from disk`, 
+        `Use custom.txt`, 
         `` )
 ]

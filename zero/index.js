@@ -11,7 +11,7 @@ const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples
 const mime = require('mime')
 const InputEvent = require('input-event')
 
-console.log('[odsk] 👤  via user:', os.userInfo().username, process.env.USER)
+console.log(`[odsk] 👤  ${os.userInfo().username} ${process.env.USER || ''}`)
 
 const INFO_RESTART = 0
 const INFO_NO_CONFIG = 1
@@ -99,12 +99,12 @@ const save = async e => {
     ENDOFDAYS = true
 
 	if (KEYBOARDED) {
+		try {
 
-        keyboard.removeListener('keyup', onKeyup)
-        keyboard.removeListener('keypress', onKeypress)
-
+   			keyboard.removeListener('keyup', onKeyup)
+    		keyboard.removeListener('keypress', onKeypress)
+		} catch(err) {}
 	}
-
 
     let { str, found, a, b } = await config()
 

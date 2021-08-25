@@ -90,13 +90,17 @@ const config = async e => {
 
 let ENDOFDAYS = false
 
+	let KEYBOARDED = false
 const save = async e => {
 
     ENDOFDAYS = true
 
+	if (KEYBOARDED) {
+
     keyboard.removeListener('keyup', onKeyup)
     keyboard.removeListener('keypress', onKeypress)
 
+	}
 
 
     let { str, found, a, b } = await config()
@@ -232,6 +236,7 @@ const gpio = async e => {
     buttons.on('released', pin => onPressed(BTNS[pin]))
     buttons.init().catch(err => ( console.error('[odsk] ❌  error initialising buttons:', err.message)))
 }
+	if (KEYBOARDED) {
 
 const input = new InputEvent('/dev/input/event0')
 const keyboard = new InputEvent.Keyboard(input)
@@ -251,7 +256,7 @@ async function onKeypress(e) {
 keyboard.on('keyup', onKeyup)
 keyboard.on('keypress', onKeypress)
 
-
+	}
 
 console.log(`[odsk] 🛣  using paths\n------------`)
 Object.entries(DIRS).forEach( o => ( console.log(`${o[0]} ${o[1]}\n------------`) ) )

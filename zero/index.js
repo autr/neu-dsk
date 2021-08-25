@@ -11,20 +11,38 @@ const TESTCMD = `omxplayer --vol 1000 -b -o alsa:hw:0,0 /home/dietpi/dsk/samples
 const mime = require('mime')
 const InputEvent = require('input-event')
 
-
 console.log('[odsk] 👤  via user:', os.userInfo().username, process.env.USER)
-
 
 const INFO_RESTART = 0
 const INFO_NO_CONFIG = 1
 
 let ARGS = minimist( process.argv.slice(2) ) 
+
 const VOLUP = 'VOLUP' 
 const VOLDOWN = 'VOLDOWN'
 const OMNI = 'OMNI'
 const SKIPNEXT = 'SKIPNEXT'
 const SKIPPREV = 'SKIPPREV'
 const PLAYPAUSE = 'PLAYPAUSE'
+
+let ENDOFDAYS = false // pi is rebooting
+let KEYBOARDED = false // pi has keyboard attached
+
+let DEBUG = ARGS?.d || false // dont reboot or show player
+let FORCE = ARGS.f // force rerendering overlays
+
+let IDX = 0 // video index
+let PROC = null // video process
+
+let VOL = -300 // current volume (read from disk)
+let VOL_MIN = -4800 
+let VOL_MAX = 0
+
+let LIST = [] // list of video files
+let GAP = 5000 // pause between files (read from disk)
+let SPLASH = 'odsk' // boot splash (read from disk)
+let TIMEOUT = null // overlay timeout
+let MODE = 0 // video mode (read from disk)
 
 const KEYS = {
     105: SKIPPREV,
@@ -47,19 +65,6 @@ const BTNS = {
 }
 
 console.log( `[odsk] 👁  using pins ${Object.keys(BTNS).join(',')}`)
-
-let DEBUG = false
-let FORCE = ARGS.f
-let ERRORS = false
-let IDX = 0
-let PROC = null
-let VOL = -300
-let LIST = [] 
-let GAP = 5000
-let SPLASH = 'odsk'
-let TIMEOUT = null
-let MODE = 0
-
 
 let CMDS = {
     player: e => process.platform == 'darwin' ? 'mplayer' : 'omxplayer',
@@ -88,17 +93,15 @@ const config = async e => {
     return { a, b, found, str }
 }
 
-let ENDOFDAYS = false
 
-	let KEYBOARDED = false
 const save = async e => {
 
     ENDOFDAYS = true
 
 	if (KEYBOARDED) {
 
-    keyboard.removeListener('keyup', onKeyup)
-    keyboard.removeListener('keypress', onKeypress)
+        keyboard.removeListener('keyup', onKeyup)
+        keyboard.removeListener('keypress', onKeypress)
 
 	}
 
@@ -146,7 +149,7 @@ ${STR.END}`
     
     setTimeout( async e => {
         console.log(`[odsk] ⚡️  rebooting now`)
-        await execSync(`sudo reboot now`) 
+        if (!DEBUG) await execSync(`sudo reboot now`) 
     }, GAP)
 }
 
@@ -167,6 +170,7 @@ async function onReleased( PIN ) {
 let RESET_TIMEOUT = null
 const RESET_TIME = 4500
 
+
 async function onPressed( PIN ) {
 
     if (ENDOFDAYS) return
@@ -184,14 +188,14 @@ async function onPressed( PIN ) {
 
     if ( PIN == VOLDOWN || PIN == VOLUP ) {
         if (!MODE_TOGGLE && PROC) {
-            if ( PIN == VOLDOWN && VOL >= -4800 + 300 ) {
-                console.log(`[o-disk] 🔊  -300 ${VOL/1000}db ${VOL}`)
+            if ( PIN == VOLDOWN && VOL >= VOL_MIN + 300 ) {
                 VOL -= 300
+                console.log(`[o-disk] 🔊  ${VOL/1000}db ${VOL}`)
                 await PROC.stdin.write('-')
             }
-            if ( PIN == VOLUP && VOL <= -300 - 300 ) {
-                console.log(`[o-disk] 🔊  +300 ${VOL/1000}db ${VOL}`)
+            if ( PIN == VOLUP && VOL <= VOL_MAX - 300 ) {
                 VOL += 300
+                console.log(`[o-disk] 🔊  ${VOL/1000}db ${VOL}`)
                 await PROC.stdin.write('+')
             }
             await fs.writeFileSync( DIRS.VOL, VOL + '' )
@@ -232,31 +236,35 @@ const gpio = async e => {
         clicked: 10
     })
     buttons.on('error', async err => ( console.log('[odsk] 🚨  button error', err) ))
-    buttons.on('pressed', pin => onPressed(BTNS[pin]))
+    buttons.on('pressed', pin => onReleased(BTNS[pin]))
     buttons.on('released', pin => onPressed(BTNS[pin]))
     buttons.init().catch(err => ( console.error('[odsk] ❌  error initialising buttons:', err.message)))
 }
-	if (KEYBOARDED) {
 
-const input = new InputEvent('/dev/input/event0')
-const keyboard = new InputEvent.Keyboard(input)
+try {
 
-async function onKeyup(e) {
-    if (ENDOFDAYS) return
-    console.log(`[odsk] 🎹  keyup ${KEYS[e.code]}`)
-    onReleased( KEYS[e.code] )
+    const keyboard = new InputEvent.Keyboard( new InputEvent('/dev/input/event0') ) 
+
+    async function onKeyup(e) {
+        if (ENDOFDAYS) return
+        console.log(`[odsk] 🎹  keyup ${KEYS[e.code]}`)
+        onReleased( KEYS[e.code] )
+    }
+
+    async function onKeypress(e) {
+        if (ENDOFDAYS) return
+        console.log(`[odsk] 🎹  keypress ${KEYS[e.code]}`)
+        onPressed( KEYS[e.code] )
+    }
+
+    keyboard.on('keyup', onKeyup)
+    keyboard.on('keypress', onKeypress)
+
+    KEYBOARDED = true
+
+} catch(err) {
+    console.log(`[odsk] 🌶  no keyboard attached ${err.message}`)
 }
-
-async function onKeypress(e) {
-    if (ENDOFDAYS) return
-    console.log(`[odsk] 🎹  keypress ${KEYS[e.code]}`)
-    onPressed( KEYS[e.code] )
-}
-
-keyboard.on('keyup', onKeyup)
-keyboard.on('keypress', onKeypress)
-
-	}
 
 console.log(`[odsk] 🛣  using paths\n------------`)
 Object.entries(DIRS).forEach( o => ( console.log(`${o[0]} ${o[1]}\n------------`) ) )
@@ -302,7 +310,7 @@ const show = async (type, idx) => {
     await KILL.fbi()
     let img = `${type}-${idx}.png`
     console.log(`[odsk] 🖼  displaying ${img}`)
-    await execSync( `sudo fbi -d /dev/fb0 -T 1 --nocomments --noverbose --cachemem 1 ${path.resolve(DIRS.BIN, `${img} > /dev/null 2>&1`)}`)
+    if (!DEBUG) await execSync( `sudo fbi -d /dev/fb0 -T 1 --nocomments --noverbose --cachemem 1 ${path.resolve(DIRS.BIN, `${img} > /dev/null 2>&1`)}`)
 }
 
 let MODE_TOGGLE = false
@@ -339,22 +347,25 @@ const start = async e => {
         console.log(`[odsk] 🎬  playing ${ path.basename(url) }`)
         console.log(`[odsk] 🎬  ${ex}`)
 
-        PROC = exec( ex, async (error, stdout, stderr) => {
+        if (!DEBUG) {
 
-            if (ENDOFDAYS) return
+            PROC = exec( ex, async (error, stdout, stderr) => {
 
-            const data = {error,stdout,stderr}
-            let type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
-            const o = data[type]
-            if (type == 'error') type = 'exited'
-            console.log(`[${CMDS.player()}] 📼   player ${type}`, o.code, o.killed || '', o.signal || '' )
- 
-            PROC = null
-            if (type == 'stdout') {
-                console.log(`[${CMDS.player()}] 📼   skipping to next from stdout`)
-                await skip(1)
-            }
-        })
+                if (ENDOFDAYS) return
+
+                const data = {error,stdout,stderr}
+                let type = error ? 'error' : stdout ? 'stdout' : stderr ? 'stderr' : ''
+                const o = data[type]
+                if (type == 'error') type = 'exited'
+                console.log(`[${CMDS.player()}] 📼   player ${type}`, o.code, o.killed || '', o.signal || '' )
+     
+                PROC = null
+                if (type == 'stdout') {
+                    console.log(`[${CMDS.player()}] 📼   skipping to next from stdout`)
+                    await skip(1)
+                }
+            })
+        }
 
     }, GAP)
 
@@ -517,33 +528,30 @@ const run = async e => {
     ])
     console.log('[odsk] 🎨  generating splash overlay')
     await create('splash', [{ text: SPLASH }], true)
-
-
-
-    // return console.log(LIST)
+    
     await start()
 }
 
 run()
 
 
-/* OMXPLAYER KEY BINDINGS 
-
-1 Increase Speed
-2 Decrease Speed
-j Previous Audio stream
-k Next Audio stream
-i Previous Chapter
-o Next Chapter
-n Previous Subtitle stream
-m Next Subtitle stream
-s Toggle subtitles
-q Exit OMXPlayer
-Space or p Pause/Resume
-- Decrease Volume
-+ Increase Volume
-Left Seek -30
-Right Seek +30
-Down Seek -600
-Up Seek +600
+/* 
+    OMXPLAYER
+    1 Increase Speed
+    2 Decrease Speed
+    j Previous Audio stream
+    k Next Audio stream
+    i Previous Chapter
+    o Next Chapter
+    n Previous Subtitle stream
+    m Next Subtitle stream
+    s Toggle subtitles
+    q Exit OMXPlayer
+    Space or p Pause/Resume
+    - Decrease Volume
+    + Increase Volume
+    Left Seek -30
+    Right Seek +30
+    Down Seek -600
+    Up Seek +600
 */

@@ -1,0 +1,21 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,1u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,188.8,-139.7,0,top
+C2,10u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,188.8,-136.5,0,top
+C3,100u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,188.9,-133.4,0,top
+C4,100n,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,178.6,-131.7,0,top
+C5,100n,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,178.6,-137,180,top
+C6,100n,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,168.3,-128.5,0,top
+C7,10u,CP_Elec_5x5.4,157.8,-133.5,180,top
+C8,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,173.1,-128.5,0,top
+C9,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,178.7,-128.5,180,top
+C10,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,173.1,-125.7,0,top
+C11,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,178.7,-125.7,180,top
+C12,100n,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,178.6,-139.5,180,top
+C13,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,193.3,-125.7,180,top
+C14,2.2u,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,193.3,-128.5,180,top
+R1,1.7k,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,166.1,-135.7,180,top
+R2,3.3k,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,166.1,-132.9,180,top
+R3,470,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,187,-125.7,180,top
+R4,470,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,187,-128.5,180,top
+U1,TPS73133DBV,SOT-23-5,184.3,-136.4,180,top
+U2,PCM5102,TSSOP-20_4.4x6.5mm_P0.65mm,172.4,-134.2,270,top

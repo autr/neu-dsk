@@ -878,12 +878,12 @@ Wire Wire Line
 Wire Wire Line
 	8050 4350 8150 4350
 $Comp
-L lib:Raspberry_Pi_Zero J?
+L lib:Raspberry_Pi_Zero J2
 U 1 1 624D310E
 P 8450 3050
-F 0 "J?" H 8450 4531 50  0000 C CNN
+F 0 "J2" H 8450 4531 50  0000 C CNN
 F 1 "Raspberry_Pi_Zero" H 8450 4440 50  0000 C CNN
-F 2 "" H 8450 3050 50  0001 C CNN
+F 2 "lib_fb:Raspberry_Pi_Zero" H 8450 3050 50  0001 C CNN
 F 3 "https://www.raspberrypi.org/documentation/hardware/raspberrypi/schematics/rpi_SCH_3bplus_1p0_reduced.pdf" H 8450 3050 50  0001 C CNN
 	1    8450 3050
 	1    0    0    -1  
@@ -909,4 +909,15 @@ Wire Wire Line
 Connection ~ 8650 4350
 Wire Wire Line
 	8650 4350 8750 4350
+$Comp
+L Connector:AudioJack4 J1
+U 1 1 624EF02B
+P 7000 4700
+F 0 "J1" V 7003 4370 50  0000 R CNN
+F 1 "AudioJack4" V 6912 4370 50  0000 R CNN
+F 2 "lib_fb:TRRS-PJ-320A-Jack" H 7000 4700 50  0001 C CNN
+F 3 "~" H 7000 4700 50  0001 C CNN
+	1    7000 4700
+	0    -1   -1   0   
+$EndComp
 $EndSCHEMATC

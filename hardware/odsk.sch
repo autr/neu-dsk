@@ -774,7 +774,7 @@ AR Path="/6245CBA6/6244C212" Ref="C?"  Part="1"
 AR Path="/6244C212" Ref="C3"  Part="1" 
 F 0 "C3" H 3158 1696 50  0000 R CNN
 F 1 "100u" H 3158 1605 50  0000 R CNN
-F 2 "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" H 3250 1650 50  0001 C CNN
+F 2 "Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder" H 3250 1650 50  0001 C CNN
 F 3 "~" H 3250 1650 50  0001 C CNN
 	1    3250 1650
 	-1   0    0    -1  

@@ -1491,7 +1491,7 @@
   (gr_text "18/24" (at 185.2 143.5) (layer "B.SilkS") (tstamp 6fcecf45-1622-43c1-baab-d97c3c15b00a)
     (effects (font (size 0.8 0.8) (thickness 0.15)) (justify mirror))
   )
-  (gr_text "5V 5V GD 14 15 18 GD 23 24 GS 25 08 07 01 GD 12 GD 16\n3V 02 03 04 GD 17 27 22 3V 10 09 11 GS 00 05 06 13 19" (at 183.66 125.55) (layer "B.SilkS") (tstamp 92d17eb0-c75d-48d9-ae9e-ea0c7f723be4)
+  (gr_text "5V 5V GD 14 15 18 GD 23 24 GD 25 08 07 01 GD 12 GD 16\n3V 02 03 04 GD 17 27 22 3V 10 09 11 GS 00 05 06 13 19" (at 183.66 125.55) (layer "B.SilkS") (tstamp 92d17eb0-c75d-48d9-ae9e-ea0c7f723be4)
     (effects (font (size 0.95 0.95) (thickness 0.15)) (justify mirror))
   )
   (gr_text "underscores.shop\ncyberboy666.com\nautr.tv" (at 152.9 140.81 90) (layer "B.SilkS") (tstamp 999da873-64db-46ef-9afc-708c26450aaf)
@@ -1509,7 +1509,7 @@
   (gr_text "20 21\n26 GD\nRUN\nTV" (at 155.8 132.39) (layer "B.SilkS") (tstamp ef58db98-6c88-473d-9622-1b8b6864b4df)
     (effects (font (size 0.95 0.95) (thickness 0.15)) (justify right mirror))
   )
-  (gr_text "DAC design\nby WallaceIT" (at 193.87 138.81) (layer "F.SilkS") (tstamp 2cbc820c-612f-436d-b7c3-fd29f8f739a8)
+  (gr_text "DAC\nWallaceIT" (at 193.87 138.81) (layer "F.SilkS") (tstamp 2cbc820c-612f-436d-b7c3-fd29f8f739a8)
     (effects (font (size 1 1) (thickness 0.15)) (justify left))
   )
 
